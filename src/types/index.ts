@@ -23,6 +23,9 @@ export type ForfaitConfig = {
   prixTotal: number;
 };
 
+export type OrderStatus = 'RECU' | 'EN_TRAITEMENT' | 'PRETE' | 'RETIRÉE';
+export type PaymentMethod = 'ESPECES' | 'MOBILE_MONEY' | 'NON_PAYE';
+
 export type OrderRecord = {
   id: string;
   created_at: string;
@@ -33,4 +36,16 @@ export type OrderRecord = {
   items: ItemPanier[];
   total_fcfa: number;
   sync_status: 'synced' | 'pending';
+  client_nom?: string;
+  client_telephone?: string;
+  montant_paye?: number;
+  moyen_paiement?: PaymentMethod;
+  statut?: OrderStatus;
+};
+
+export type CheckoutDetails = {
+  client_nom: string;
+  client_telephone: string;
+  montant_paye: number;
+  moyen_paiement: PaymentMethod;
 };

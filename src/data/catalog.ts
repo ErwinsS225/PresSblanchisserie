@@ -36,14 +36,14 @@ export const DEFAULT_FORFAITS: Record<PrestationBlanchisserie, ForfaitConfig> = 
 };
 
 // Prix de démonstration en FCFA, personnalisables depuis les paramètres à venir.
-const PRESSING_PRICES: Record<PrestationPressing, Record<string, number>> = {
+export const PRESSING_PRICES: Record<PrestationPressing, Record<string, number>> = {
   LAVAGE_REPASSAGE: { chemise: 700, polo: 600, 'tee-shirt': 500, veste: 1800, pantalon: 900, jean: 900, jupe: 800, robe: 1500, boubou: 1800, drap: 1000, serviette: 500, rideau: 2500 },
   NETTOYAGE_SEC: { chemise: 1200, polo: 1000, 'tee-shirt': 900, veste: 3000, pantalon: 1600, jean: 1600, jupe: 1400, robe: 2800, boubou: 3200, drap: 2000, serviette: 1000, rideau: 4000 },
   AMIDONNAGE: { chemise: 500, polo: 400, 'tee-shirt': 350, veste: 800, pantalon: 500, jean: 500, jupe: 500, robe: 900, boubou: 1200, drap: 800, serviette: 300, rideau: 1200 },
   DETACHAGE: { chemise: 500, polo: 500, 'tee-shirt': 500, veste: 1000, pantalon: 700, jean: 700, jupe: 700, robe: 1000, boubou: 1200, drap: 800, serviette: 500, rideau: 1500 },
   GESTION_TACHES: { chemise: 700, polo: 600, 'tee-shirt': 600, veste: 1200, pantalon: 900, jean: 900, jupe: 800, robe: 1400, boubou: 1500, drap: 1000, serviette: 600, rideau: 1800 }
 };
-const BLANCHISSERIE_PRICES: Record<PrestationBlanchisserie, Record<string, number>> = {
+export const BLANCHISSERIE_PRICES: Record<PrestationBlanchisserie, Record<string, number>> = {
   LAVAGE_SIMPLE: { chemise: 250, polo: 250, 'tee-shirt': 200, veste: 700, pantalon: 350, jean: 350, jupe: 300, robe: 500, boubou: 700, drap: 500, serviette: 200, rideau: 1000 },
   LAVAGE_REPASSAGE: { chemise: 400, polo: 350, 'tee-shirt': 300, veste: 1000, pantalon: 500, jean: 500, jupe: 450, robe: 800, boubou: 1000, drap: 700, serviette: 300, rideau: 1500 },
   REPASSAGE: { chemise: 300, polo: 250, 'tee-shirt': 200, veste: 700, pantalon: 400, jean: 400, jupe: 350, robe: 650, boubou: 800, drap: 500, serviette: 250, rideau: 1200 }
