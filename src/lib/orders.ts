@@ -1,5 +1,5 @@
 import { createClient } from '@supabase/supabase-js';
-import type { OrderRecord, OrderStatus } from '../types';
+import type { OrderRecord, OrderStatus, PaymentEntry, PaymentMethod } from '../types';
 
 const supabaseUrl = import.meta.env.VITE_SUPABASE_URL as string | undefined;
 const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY as string | undefined;
@@ -46,7 +46,11 @@ const toDatabaseRow = (order: OrderRecord) => ({
   client_telephone: order.client_telephone ?? null,
   montant_paye: order.montant_paye ?? 0,
   moyen_paiement: order.moyen_paiement ?? 'NON_PAYE',
-  statut: order.statut ?? 'RECU'
+  paiements: order.paiements ?? [],
+  statut: order.statut ?? 'RECU',
+  retrait_prevu: order.retrait_prevu ?? null,
+  express: order.express ?? false,
+  consignes: order.consignes ?? null
 });
 
 /** Toujours conserve le ticket localement ; Supabase est utilisé dès qu'il est configuré et joignable. */
@@ -102,6 +106,26 @@ export async function setOrderStatus(id: string, statut: OrderStatus): Promise<'
       upsertLocalOrder({ ...updated, sync_status: 'synced' });
       return 'synced';
     }
+  }
+  queueOffline(updated);
+  return 'pending';
+}
+
+export async function recordPayment(id: string, amount: number, method: Exclude<PaymentMethod, 'NON_PAYE'>): Promise<'synced' | 'pending'> {
+  const order = getLocalOrders().find((item) => item.id === id);
+  if (!order || amount <= 0) return 'pending';
+  const payment: PaymentEntry = { id: `PAY-${Date.now().toString(36).toUpperCase()}`, created_at: new Date().toISOString(), amount_fcfa: amount, method };
+  const updated: OrderRecord = {
+    ...order,
+    montant_paye: Math.min(order.total_fcfa, (order.montant_paye ?? 0) + amount),
+    moyen_paiement: method,
+    paiements: [...(order.paiements ?? []), payment],
+    sync_status: 'pending'
+  };
+  upsertLocalOrder(updated);
+  if (navigator.onLine && supabase) {
+    const { error } = await supabase.from('orders').update({ montant_paye: updated.montant_paye, moyen_paiement: method, paiements: updated.paiements, sync_status: 'synced' }).eq('id', id);
+    if (!error) { upsertLocalOrder({ ...updated, sync_status: 'synced' }); return 'synced'; }
   }
   queueOffline(updated);
   return 'pending';

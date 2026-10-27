@@ -14,9 +14,11 @@ La version de production se vérifie avec `npm run build`. La PWA précache l'ap
 ## Fonctionnalités
 
 - **Comptoir** : pressing au kilo avec suivi des pièces, pressing à l'unité et blanchisserie avec forfaits.
-- **Encaissement** : fiche client facultative, espèces/mobile money, acompte ou paiement complet, solde dû visible.
-- **Suivi** : commandes reçues, en traitement, prêtes et retirées ; recherche par numéro de ticket, client ou téléphone.
-- **Historique et activité** : liste filtrable, état des paiements, chiffre d'affaires et vue des 7 derniers jours.
+- **Encaissement** : fiche client facultative, espèces, Wave, MTN MoMo ou Orange Money ; acompte, paiements successifs et solde dû.
+- **Réception** : date de retrait, consignes, option Express (+50 %) et ticket imprimable.
+- **Production** : kanban tactile Réception → Lavage → Finition → Prêt → Retiré, avec alertes de retard.
+- **Caisse & remises** : recouvrement des soldes, ventilation des paiements par moyen et clôture journalière.
+- **Clients, historique et activité** : carnet dérivé des tickets, recherche par téléphone/nom, suivi des commandes, chiffre d'affaires et vue des 7 derniers jours.
 - **Paramètres** : tarif au kilo, tarifs unitaires par vêtement/prestation et règles forfaitaires modifiables. Les paramètres sont persistés localement sur la tablette.
 - **Hors connexion** : tickets et changements d'état mis en file et synchronisés au retour du réseau.
 
@@ -41,7 +43,11 @@ create table public.orders (
   client_telephone text,
   montant_paye integer not null default 0,
   moyen_paiement text not null default 'NON_PAYE',
-  statut text not null default 'RECU'
+  paiements jsonb not null default '[]'::jsonb,
+  statut text not null default 'RECU',
+  retrait_prevu timestamptz,
+  express boolean not null default false,
+  consignes text
 );
 ```
 
@@ -53,7 +59,11 @@ alter table public.orders
   add column if not exists client_telephone text,
   add column if not exists montant_paye integer not null default 0,
   add column if not exists moyen_paiement text not null default 'NON_PAYE',
-  add column if not exists statut text not null default 'RECU';
+  add column if not exists paiements jsonb not null default '[]'::jsonb,
+  add column if not exists statut text not null default 'RECU',
+  add column if not exists retrait_prevu timestamptz,
+  add column if not exists express boolean not null default false,
+  add column if not exists consignes text;
 ```
 
 Pour un essai uniquement, configurez les politiques RLS pour autoriser lecture, insertion et mise à jour des tickets depuis l'application. **Ne laissez pas de politique publique ouverte en production** : ajoutez l'authentification du personnel et des règles d'accès adaptées avant d'y conserver des données clients. Les paramètres tarifaires sont pour l'instant propres à chaque tablette ; leur synchronisation entre appareils est une évolution ultérieure.

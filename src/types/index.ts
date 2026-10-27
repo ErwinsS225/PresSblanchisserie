@@ -23,8 +23,9 @@ export type ForfaitConfig = {
   prixTotal: number;
 };
 
-export type OrderStatus = 'RECU' | 'EN_TRAITEMENT' | 'PRETE' | 'RETIRÉE';
-export type PaymentMethod = 'ESPECES' | 'MOBILE_MONEY' | 'NON_PAYE';
+export type OrderStatus = 'RECU' | 'LAVAGE' | 'FINITION' | 'PRETE' | 'RETIRÉE';
+export type PaymentMethod = 'ESPECES' | 'WAVE' | 'MTN_MONEY' | 'ORANGE_MONEY' | 'NON_PAYE';
+export type PaymentEntry = { id: string; created_at: string; amount_fcfa: number; method: Exclude<PaymentMethod, 'NON_PAYE'> };
 
 export type OrderRecord = {
   id: string;
@@ -40,7 +41,11 @@ export type OrderRecord = {
   client_telephone?: string;
   montant_paye?: number;
   moyen_paiement?: PaymentMethod;
+  paiements?: PaymentEntry[];
   statut?: OrderStatus;
+  retrait_prevu?: string;
+  express?: boolean;
+  consignes?: string;
 };
 
 export type CheckoutDetails = {
@@ -48,4 +53,7 @@ export type CheckoutDetails = {
   client_telephone: string;
   montant_paye: number;
   moyen_paiement: PaymentMethod;
+  retrait_prevu: string;
+  express: boolean;
+  consignes: string;
 };

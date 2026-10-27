@@ -1,24 +1,28 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { Banknote, ClipboardList, Clock3, PackageCheck, TrendingUp } from 'lucide-react';
+import { Banknote, ClipboardList, Clock3, PackageCheck, Plus, TrendingUp, Wallet, Wind } from 'lucide-react';
 import { listOrders } from '../lib/orders';
 import type { OrderRecord, OrderStatus } from '../types';
 import { cn } from '../lib/utils';
 import { formatFCFA } from '../components/order/CartSidebar';
 
 const statusInfo: Record<OrderStatus, { label: string; color: string }> = {
-  RECU: { label: 'Reçues', color: 'bg-blue-500' }, EN_TRAITEMENT: { label: 'En traitement', color: 'bg-amber-500' }, PRETE: { label: 'Prêtes', color: 'bg-emerald-500' }, RETIRÉE: { label: 'Retirées', color: 'bg-slate-400' }
+  RECU: { label: 'Réceptionnées', color: 'bg-zinc-500' }, LAVAGE: { label: 'En lavage', color: 'bg-blue-500' }, FINITION: { label: 'Repassage / finition', color: 'bg-amber-500' }, PRETE: { label: 'Prêtes à remettre', color: 'bg-violet-500' }, RETIRÉE: { label: 'Retirées', color: 'bg-emerald-500' }
 };
 
-export default function DashboardPage() {
+export default function DashboardPage({ onReception, onCash, onProduction }: { onReception?: () => void; onCash?: () => void; onProduction?: () => void }) {
   const [orders, setOrders] = useState<OrderRecord[]>([]);
   const reload = useCallback(async () => setOrders(await listOrders()), []);
   useEffect(() => { void reload(); }, [reload]);
   const today = new Date().toLocaleDateString('fr-CA');
   const todayOrders = orders.filter((order) => new Date(order.created_at).toLocaleDateString('fr-CA') === today);
-  const collectedToday = todayOrders.reduce((sum, order) => sum + (order.montant_paye ?? 0), 0);
+  const todayPayments = orders.flatMap((order) => order.paiements ?? []).filter((payment) => new Date(payment.created_at).toLocaleDateString('fr-CA') === today);
+  const collectedToday = todayPayments.reduce((sum, payment) => sum + payment.amount_fcfa, 0);
   const dueToday = todayOrders.reduce((sum, order) => sum + Math.max(0, order.total_fcfa - (order.montant_paye ?? 0)), 0);
-  const inProgress = orders.filter((order) => ['RECU', 'EN_TRAITEMENT'].includes(order.statut ?? 'RECU')).length;
-  const ready = orders.filter((order) => order.statut === 'PRETE').length;
+  const activeOrders = orders.filter((order) => ['RECU', 'LAVAGE', 'FINITION'].includes(order.statut ?? 'RECU'));
+  const inProgressItems = activeOrders.reduce((sum, order) => sum + order.items.reduce((total, item) => total + item.quantite, 0), 0);
+  const readyOrders = orders.filter((order) => order.statut === 'PRETE');
+  const readyAmount = readyOrders.reduce((sum, order) => sum + Math.max(0, order.total_fcfa - (order.montant_paye ?? 0)), 0);
+  const lateCount = orders.filter((order) => order.retrait_prevu && new Date(order.retrait_prevu).getTime() < Date.now() && !['PRETE', 'RETIRÉE'].includes(order.statut ?? 'RECU')).length;
   const lastSevenDays = useMemo(() => Array.from({ length: 7 }, (_, index) => {
     const date = new Date(); date.setDate(date.getDate() - (6 - index));
     const key = date.toLocaleDateString('fr-CA');
@@ -26,12 +30,17 @@ export default function DashboardPage() {
     return { label: date.toLocaleDateString('fr-FR', { weekday: 'short' }), total: dayOrders.reduce((sum, order) => sum + order.total_fcfa, 0), count: dayOrders.length };
   }), [orders]);
   const maxTotal = Math.max(1, ...lastSevenDays.map((day) => day.total));
+  const dailyRevenue = todayOrders.reduce((sum, order) => sum + order.total_fcfa, 0);
+  const averageBasket = todayOrders.length ? Math.round(dailyRevenue / todayOrders.length) : 0;
   const cards = [
-    { label: 'Commandes aujourd’hui', value: todayOrders.length.toString(), detail: 'Tickets créés ce jour', icon: ClipboardList, color: 'text-blue-700 bg-blue-50' },
-    { label: 'Encaissé aujourd’hui', value: formatFCFA(collectedToday), detail: dueToday > 0 ? `${formatFCFA(dueToday)} restent à encaisser` : 'Tous les paiements soldés', icon: Banknote, color: 'text-emerald-700 bg-emerald-50' },
-    { label: 'À traiter', value: inProgress.toString(), detail: `${ready} commande${ready !== 1 ? 's' : ''} prête${ready !== 1 ? 's' : ''} au retrait`, icon: Clock3, color: 'text-amber-700 bg-amber-50' },
-    { label: 'Chiffre d’affaires du jour', value: formatFCFA(todayOrders.reduce((sum, order) => sum + order.total_fcfa, 0)), detail: 'Montant total facturé aujourd’hui', icon: TrendingUp, color: 'text-violet-700 bg-violet-50' }
+    { label: 'CA facturé aujourd’hui', value: formatFCFA(dailyRevenue), detail: `${todayOrders.length} tickets · panier moyen ${formatFCFA(averageBasket)}`, icon: TrendingUp, color: 'text-violet-700 bg-violet-50' },
+    { label: 'Commandes en cours', value: activeOrders.length.toString(), detail: `${inProgressItems} articles · ${lateCount} en retard`, icon: ClipboardList, color: 'text-blue-700 bg-blue-50' },
+    { label: 'Prêts à remettre', value: formatFCFA(readyAmount), detail: `${readyOrders.length} ticket${readyOrders.length !== 1 ? 's' : ''} au comptoir${readyAmount ? ' · solde à encaisser' : ''}`, icon: Clock3, color: 'text-amber-700 bg-amber-50' },
+    { label: 'Encaissé aujourd’hui', value: formatFCFA(collectedToday), detail: dueToday > 0 ? `${formatFCFA(dueToday)} restent à payer sur les nouveaux tickets` : 'Encaissements enregistrés ce jour', icon: Banknote, color: 'text-emerald-700 bg-emerald-50' }
   ];
+  const recentOrders = orders.slice(0, 6);
+  const lateOrders = orders.filter((order) => order.retrait_prevu && new Date(order.retrait_prevu).getTime() < Date.now() && !['PRETE', 'RETIRÉE'].includes(order.statut ?? 'RECU')).slice(0, 4);
+  const shortStatus: Record<OrderStatus, string> = { RECU: 'Réceptionné', LAVAGE: 'En lavage', FINITION: 'Finition', PRETE: 'Prêt', RETIRÉE: 'Retiré' };
 
   return <div className="mx-auto w-full max-w-[1500px] px-4 py-5 sm:px-6 lg:px-8 lg:py-7">
     <div className="mb-6"><p className="mb-1 flex items-center gap-1.5 text-[11px] font-extrabold uppercase tracking-[.15em] text-blue-600"><TrendingUp size={14} /> Vue d’ensemble</p><h1 className="text-2xl font-black tracking-tight text-slate-900 sm:text-3xl">Tableau de bord</h1><p className="mt-1 text-sm text-slate-500">L’activité du comptoir en un coup d’œil.</p></div>
@@ -41,6 +50,11 @@ export default function DashboardPage() {
       <section className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm"><div className="mb-5 flex items-center justify-between"><div><h2 className="font-extrabold text-slate-900">Activité sur 7 jours</h2><p className="mt-1 text-xs text-slate-400">Montant des commandes par jour</p></div><div className="grid h-9 w-9 place-items-center rounded-xl bg-blue-50 text-blue-700"><TrendingUp size={17} /></div></div><div className="flex h-48 items-end gap-3 border-b border-slate-100 pb-2 sm:gap-5">{lastSevenDays.map((day, index) => <div key={`${day.label}-${index}`} className="flex h-full flex-1 flex-col items-center justify-end gap-2"><span className="text-[9px] font-bold text-slate-400 sm:text-[10px]">{day.total ? `${Math.round(day.total / 1000)}k` : ''}</span><div className="flex h-[78%] w-full items-end"><div className={cn('w-full rounded-t-lg transition-all', index === 6 ? 'bg-blue-600' : 'bg-blue-200')} style={{ height: `${day.total ? Math.max(8, (day.total / maxTotal) * 100) : 4}%` }} /></div><span className="text-[10px] font-bold capitalize text-slate-400">{day.label}</span></div>)}</div><div className="mt-3 flex items-center justify-between text-[11px] text-slate-400"><span>{lastSevenDays.reduce((sum, day) => sum + day.count, 0)} commandes sur la période</span><span className="font-extrabold text-slate-600">{formatFCFA(lastSevenDays.reduce((sum, day) => sum + day.total, 0))}</span></div></section>
 
       <section className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm"><div className="mb-5 flex items-center justify-between"><div><h2 className="font-extrabold text-slate-900">État des commandes</h2><p className="mt-1 text-xs text-slate-400">Toutes les commandes enregistrées</p></div><PackageCheck size={19} className="text-slate-400" /></div><div className="space-y-4">{(Object.keys(statusInfo) as OrderStatus[]).map((status) => { const count = orders.filter((order) => (order.statut ?? 'RECU') === status).length; const width = orders.length ? Math.max(count ? 5 : 0, count / orders.length * 100) : 0; return <div key={status}><div className="mb-1.5 flex justify-between text-xs"><span className="font-bold text-slate-600">{statusInfo[status].label}</span><span className="font-extrabold text-slate-800">{count}</span></div><div className="h-2 overflow-hidden rounded-full bg-slate-100"><div className={cn('h-full rounded-full transition-all', statusInfo[status].color)} style={{ width: `${width}%` }} /></div></div>; })}</div><div className="mt-5 rounded-xl bg-slate-50 p-3 text-xs font-medium text-slate-500">Total de <b className="text-slate-800">{orders.length}</b> commande{orders.length !== 1 ? 's' : ''} dans l’historique local.</div></section>
+    </div>
+
+    <div className="mt-4 grid gap-4 xl:grid-cols-[minmax(0,2fr)_minmax(290px,.9fr)]">
+      <section className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm"><div className="flex items-center justify-between border-b border-slate-100 px-4 py-3"><div><h2 className="text-sm font-extrabold text-slate-800">Dernières réceptions</h2><p className="text-[11px] text-slate-400">Tickets à traiter en atelier</p></div><button onClick={onProduction} className="text-xs font-bold text-blue-700 hover:underline">Ouvrir la production →</button></div><div className="overflow-x-auto"><table className="w-full min-w-[720px] text-left text-xs"><thead className="bg-slate-50 text-[10px] uppercase tracking-wide text-slate-400"><tr><th className="px-4 py-2.5">Ticket</th><th className="px-4 py-2.5">Client</th><th className="px-4 py-2.5">Articles</th><th className="px-4 py-2.5">Total</th><th className="px-4 py-2.5">Retour prévu</th><th className="px-4 py-2.5">Statut</th></tr></thead><tbody className="divide-y divide-slate-100">{recentOrders.map((order) => <tr key={order.id}><td className="px-4 py-3 font-black">{order.id}</td><td className="px-4 py-3"><b>{order.client_nom || 'Client comptoir'}</b><br /><span className="text-[10px] text-slate-400">{order.client_telephone || '—'}</span></td><td className="px-4 py-3">{order.mode === 'KILO' ? `${order.poids_kg ?? 0} kg` : `${order.items.reduce((sum, item) => sum + item.quantite, 0)} pièces`}</td><td className="px-4 py-3 font-extrabold">{formatFCFA(order.total_fcfa)}</td><td className="px-4 py-3 text-slate-500">{order.retrait_prevu ? new Date(order.retrait_prevu).toLocaleString('fr-FR', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' }) : 'À définir'}</td><td className="px-4 py-3"><span className="rounded-full bg-blue-50 px-2 py-1 text-[10px] font-bold text-blue-700">{shortStatus[order.statut ?? 'RECU']}</span></td></tr>)}</tbody></table></div>{recentOrders.length === 0 && <p className="p-8 text-center text-xs text-slate-400">Les nouvelles commandes apparaîtront ici.</p>}</section>
+      <div className="space-y-4"><section className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm"><h2 className="mb-3 text-sm font-extrabold text-slate-800">Actions rapides</h2><div className="grid grid-cols-2 gap-2"><button onClick={onReception} className="flex h-10 items-center justify-center gap-1.5 rounded-lg border border-slate-200 text-xs font-bold hover:bg-slate-50"><Plus size={14} /> Réception</button><button onClick={onCash} className="flex h-10 items-center justify-center gap-1.5 rounded-lg border border-slate-200 text-xs font-bold hover:bg-slate-50"><Wallet size={14} /> Encaisser</button><button onClick={onProduction} className="col-span-2 flex h-10 items-center justify-center gap-1.5 rounded-lg bg-zinc-900 text-xs font-bold text-white hover:bg-zinc-800"><Wind size={14} /> Suivi atelier</button></div></section><section className="rounded-2xl border border-rose-100 bg-white p-4 shadow-sm"><div className="mb-2 flex items-center justify-between"><h2 className="text-sm font-extrabold text-slate-800">Retards prioritaires</h2><span className="rounded-full bg-rose-100 px-2 py-1 text-[10px] font-extrabold text-rose-700">{lateOrders.length}</span></div>{lateOrders.length ? <div className="space-y-2">{lateOrders.map((order) => <div key={order.id} className="flex items-center justify-between gap-2 rounded-lg border border-rose-100 px-2.5 py-2"><div className="min-w-0"><p className="truncate text-xs font-extrabold">{order.id} · {order.client_nom || 'Client comptoir'}</p><p className="text-[10px] text-slate-500">{order.retrait_prevu && new Date(order.retrait_prevu).toLocaleDateString('fr-FR')}</p></div><span className="rounded-full bg-rose-600 px-2 py-1 text-[9px] font-black text-white">RETARD</span></div>)}</div> : <p className="rounded-lg bg-emerald-50 p-3 text-xs font-semibold text-emerald-700">Aucune commande en retard aujourd’hui.</p>}</section></div>
     </div>
   </div>;
 }
