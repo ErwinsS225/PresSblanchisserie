@@ -46,7 +46,7 @@ export default function ClothingGrid() {
 
       {isKilo && <div className="mb-3 flex items-center gap-2 rounded-xl border border-blue-100 bg-blue-50 px-3 py-2 text-xs font-semibold text-blue-800"><Sparkles size={15} /> Le suivi des pièces est inclus — le montant reste calculé au poids.</div>}
 
-      <div className="grid flex-1 auto-rows-[minmax(126px,1fr)] grid-cols-2 gap-3 overflow-y-auto pb-3 sm:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5">
+      <div className="grid flex-1 auto-rows-[minmax(126px,1fr)] grid-cols-2 gap-3 overflow-y-auto pb-3 sm:grid-cols-3 lg:grid-cols-2 xl:grid-cols-4 2xl:grid-cols-5">
         {items.map((item) => {
           const quantity = panier.find((line) => line.vetement.id === item.id)?.quantite ?? 0;
           return <button key={item.id} type="button" onClick={() => addItem(item)} aria-label={`Ajouter ${item.nom}${quantity ? `, quantité actuelle ${quantity}` : ''}`} className={cn('card relative flex min-h-[126px] select-none flex-col items-center justify-center gap-2 rounded-2xl border bg-white p-3 text-center shadow-sm transition-all duration-150 hover:-translate-y-0.5 hover:shadow-md active:scale-95', quantity ? theme === 'PRESSING' ? 'border-blue-300 ring-2 ring-blue-100' : 'border-teal-300 ring-2 ring-teal-100' : 'border-slate-200')}>
